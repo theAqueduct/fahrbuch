@@ -2,6 +2,22 @@ import { DeviceMotion, DeviceMotionMeasurement } from 'expo-sensors';
 import * as Location from 'expo-location';
 import { ActivityType, ActivityEvent, Location as LocationType } from '../types';
 
+// Global debug logger that components can subscribe to
+class DebugLogger {
+  private listeners: ((message: string) => void)[] = [];
+  
+  addListener(callback: (message: string) => void) {
+    this.listeners.push(callback);
+  }
+  
+  log(message: string) {
+    console.log(message);
+    this.listeners.forEach(callback => callback(message));
+  }
+}
+
+export const debugLogger = new DebugLogger();
+
 export class ActivityService {
   private isMonitoring = false;
   private activityCallbacks: ((activity: ActivityEvent) => void)[] = [];
@@ -19,18 +35,18 @@ export class ActivityService {
   // Check and log current permission status for debugging
   private async logCurrentPermissionStatus(): Promise<void> {
     try {
-      console.log('🔍 [ActivityService] Checking current permission status...');
+      debugLogger.log('🔍 [ActivityService] Checking current permission status...');
       
       // Check foreground location permission
       const foregroundStatus = await Location.getForegroundPermissionsAsync();
-      console.log('📍 [ActivityService] Current foreground location status:', JSON.stringify(foregroundStatus));
+      debugLogger.log(`📍 [ActivityService] Current foreground location status: ${JSON.stringify(foregroundStatus)}`);
       
       // Check background location permission  
       const backgroundStatus = await Location.getBackgroundPermissionsAsync();
-      console.log('🔒 [ActivityService] Current background location status:', JSON.stringify(backgroundStatus));
+      debugLogger.log(`🔒 [ActivityService] Current background location status: ${JSON.stringify(backgroundStatus)}`);
       
     } catch (error) {
-      console.error('💥 [ActivityService] Error checking permission status:', error);
+      debugLogger.log(`💥 [ActivityService] Error checking permission status: ${error.message}`);
     }
   }
 
@@ -39,101 +55,83 @@ export class ActivityService {
     type: 'foreground' | 'background',
     requestFunction: () => Promise<{ status: string }>
   ): Promise<boolean> {
-    console.log(`🔄 [ActivityService] Requesting ${type} permission (iOS-friendly)...`);
+    debugLogger.log(`🔄 [ActivityService] Requesting ${type} permission (iOS-friendly)...`);
     
     try {
       const result = await requestFunction();
-      console.log(`📋 [ActivityService] Permission result for ${type}:`, JSON.stringify(result));
+      debugLogger.log(`📋 [ActivityService] Permission result for ${type}: ${JSON.stringify(result)}`);
       
       if (result.status === 'granted') {
-        console.log(`✅ [ActivityService] ${type} permission granted!`);
+        debugLogger.log(`✅ [ActivityService] ${type} permission granted!`);
         return true;
       }
       
       // Log the specific denial reason
-      console.warn(`⚠️ [ActivityService] ${type} permission denied:`, result.status);
+      debugLogger.log(`⚠️ [ActivityService] ${type} permission denied: ${result.status}`);
       
       // Different messages based on permission type and status
       if (result.status === 'denied') {
-        console.error(`❌ [ActivityService] ${type} permission permanently denied by user`);
+        debugLogger.log(`❌ [ActivityService] ${type} permission permanently denied by user`);
       } else if (result.status === 'undetermined') {
-        console.error(`❓ [ActivityService] ${type} permission undetermined - user hasn't decided yet`);
+        debugLogger.log(`❓ [ActivityService] ${type} permission undetermined - user hasn't decided yet`);
       } else {
-        console.error(`⚠️ [ActivityService] ${type} permission status: ${result.status}`);
+        debugLogger.log(`⚠️ [ActivityService] ${type} permission status: ${result.status}`);
       }
       
-      // Show user-friendly message
-      const permissionName = type === 'foreground' ? 'Location Access' : 'Background Location';
-      const settingsMessage = 
-        `❌ ${permissionName.toUpperCase()} REQUIRED\n\n` +
-        `Status: ${result.status}\n\n` +
-        `Fahrbuch needs location access for German tax-compliant mileage tracking.\n\n` +
-        `To enable:\n` +
-        `1. Open iOS Settings\n` +
-        `2. Find "Fahrbuch" app\n` +
-        `3. Tap "Location"\n` +
-        `4. Select "Always" (for background tracking)\n\n` +
-        `The app will work once permissions are granted.`;
-      
-      console.error(`SETTINGS REQUIRED: ${settingsMessage}`);
       return false;
       
     } catch (error) {
-      console.error(`💥 [ActivityService] Error requesting ${type} permission:`, error);
-      console.error(`💥 [ActivityService] Error message:`, error.message);
-      console.error(`💥 [ActivityService] Error stack:`, error.stack);
-      
-      // Permission API itself failed
-      console.error(`💥 [ActivityService] Permission API failed for ${type} - this suggests a code issue`);
+      debugLogger.log(`💥 [ActivityService] Error requesting ${type} permission: ${error.message}`);
+      debugLogger.log(`💥 [ActivityService] Permission API failed for ${type} - this suggests a code issue`);
       return false;
     }
   }
 
   // Start monitoring device activity - iOS-FRIENDLY PERMISSION STRATEGY
   async startMonitoring(): Promise<boolean> {
-    console.log('🔍 [ActivityService] Starting monitoring, checking current permissions...');
+    debugLogger.log('🔍 [ActivityService] Starting monitoring, checking current permissions...');
     
     try {
       // Check current permission status first
       await this.logCurrentPermissionStatus();
       
       // Request foreground permissions
-      console.log('📍 [ActivityService] Requesting foreground location permissions...');
+      debugLogger.log('📍 [ActivityService] Requesting foreground location permissions...');
       const foregroundResult = await this.requestPermissionAggressively(
         'foreground', 
         () => Location.requestForegroundPermissionsAsync()
       );
       
-      console.log('📍 [ActivityService] Foreground result:', foregroundResult);
+      debugLogger.log(`📍 [ActivityService] Foreground result: ${foregroundResult}`);
       
       if (!foregroundResult) {
-        console.log('❌ [ActivityService] Foreground permission denied - app cannot track location');
+        debugLogger.log('❌ [ActivityService] Foreground permission denied - app cannot track location');
         return false; // Return false instead of throwing
       }
 
-      console.log('🔒 [ActivityService] Requesting background location permissions...');
+      debugLogger.log('🔒 [ActivityService] Requesting background location permissions...');
       const backgroundResult = await this.requestPermissionAggressively(
         'background',
         () => Location.requestBackgroundPermissionsAsync()
       );
       
-      console.log('🔒 [ActivityService] Background result:', backgroundResult);
+      debugLogger.log(`🔒 [ActivityService] Background result: ${backgroundResult}`);
       
       if (!backgroundResult) {
-        console.log('⚠️ [ActivityService] Background permission denied - trips may not auto-detect when app is closed');
+        debugLogger.log('⚠️ [ActivityService] Background permission denied - trips may not auto-detect when app is closed');
         // Continue without background - app can still work in foreground
       }
 
-      console.log('✅ [ActivityService] Permissions processed, starting services...');
+      debugLogger.log('✅ [ActivityService] Permissions processed, starting services...');
     } catch (permissionError) {
-      console.error('💥 [ActivityService] Permission error:', permissionError);
+      debugLogger.log(`💥 [ActivityService] Permission error: ${permissionError.message}`);
       return false; // Return false instead of throwing
     }
 
     try {
 
       // Start location tracking
-      console.log('🌍 [ActivityService] Starting location tracking...');
+      debugLogger.log('🌍 [ActivityService] Starting location tracking...');
       this.locationSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
@@ -142,20 +140,19 @@ export class ActivityService {
         },
         this.handleLocationUpdate.bind(this)
       );
-      console.log('✅ [ActivityService] Location tracking started');
+      debugLogger.log('✅ [ActivityService] Location tracking started');
 
       // Start motion sensor
-      console.log('📱 [ActivityService] Starting motion sensor...');
+      debugLogger.log('📱 [ActivityService] Starting motion sensor...');
       DeviceMotion.setUpdateInterval(1000); // 1 second
       DeviceMotion.addListener(this.handleMotionUpdate.bind(this));
-      console.log('✅ [ActivityService] Motion sensor started');
+      debugLogger.log('✅ [ActivityService] Motion sensor started');
 
       this.isMonitoring = true;
-      console.log('✅ [ActivityService] Activity monitoring started successfully');
+      debugLogger.log('✅ [ActivityService] Activity monitoring started successfully');
       return true;
     } catch (serviceError) {
-      console.error('💥 [ActivityService] Failed to start activity monitoring services:', serviceError);
-      console.error('💥 [ActivityService] Service error stack:', serviceError.stack);
+      debugLogger.log(`💥 [ActivityService] Failed to start activity monitoring services: ${serviceError.message}`);
       return false;
     }
   }

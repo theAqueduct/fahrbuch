@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { ActivityService } from './ActivityService';
+import { ActivityService, debugLogger } from './ActivityService';
 import { 
   Trip, 
   TripStatus, 
@@ -29,29 +29,28 @@ export class TripService {
   }
 
   async initialize(): Promise<boolean> {
-    console.log('🚀 [TripService] Initialize called');
+    debugLogger.log('🚀 [TripService] Initialize called');
     
     try {
       // AGGRESSIVE: Request notification permissions first
-      console.log('📢 [TripService] Requesting notification permissions...');
+      debugLogger.log('📢 [TripService] Requesting notification permissions...');
       await this.requestNotificationPermissionsAggressively();
-      console.log('✅ [TripService] Notification permissions done');
+      debugLogger.log('✅ [TripService] Notification permissions done');
       
-      console.log('📍 [TripService] Starting ActivityService monitoring...');
+      debugLogger.log('📍 [TripService] Starting ActivityService monitoring...');
       const success = await this.activityService.startMonitoring();
-      console.log('📍 [TripService] ActivityService monitoring result:', success);
+      debugLogger.log(`📍 [TripService] ActivityService monitoring result: ${success}`);
       
       if (success) {
         this.isTracking = true;
-        console.log('✅ [TripService] TripService initialized and tracking started');
+        debugLogger.log('✅ [TripService] TripService initialized and tracking started');
       } else {
-        console.log('❌ [TripService] ActivityService monitoring failed');
+        debugLogger.log('❌ [TripService] ActivityService monitoring failed');
       }
       
       return success;
     } catch (error) {
-      console.error('💥 [TripService] Error during initialization:', error);
-      console.error('💥 [TripService] Error stack:', error.stack);
+      debugLogger.log(`💥 [TripService] Error during initialization: ${error.message}`);
       return false;
     }
   }
@@ -59,34 +58,21 @@ export class TripService {
   // iOS-FRIENDLY notification permission strategy
   private async requestNotificationPermissionsAggressively(): Promise<void> {
     try {
-      console.log('🔔 [TripService] Requesting notification permissions...');
+      debugLogger.log('🔔 [TripService] Requesting notification permissions...');
       
       const result = await Notifications.requestPermissionsAsync();
-      console.log('🔔 [TripService] Notification permission result:', JSON.stringify(result));
+      debugLogger.log(`🔔 [TripService] Notification permission result: ${JSON.stringify(result)}`);
       
       if (result.status === 'granted') {
-        console.log('✅ [TripService] Notification permissions granted');
+        debugLogger.log('✅ [TripService] Notification permissions granted');
         return;
       }
       
       // Log specific denial reason
-      console.warn(`⚠️ [TripService] Notification permission denied: ${result.status}`);
-      
-      // Show user-friendly message
-      const message = 
-        `🔔 NOTIFICATIONS RECOMMENDED\n\n` +
-        `Status: ${result.status}\n\n` +
-        `Notifications help you:\n` +
-        `• Get alerted when trips end\n` +
-        `• Tag trips immediately for accuracy\n` +
-        `• Maintain complete mileage logs\n\n` +
-        `You can enable in Settings > Notifications > Fahrbuch later.`;
-      
-      console.warn(`NOTIFICATION INFO: ${message}`);
+      debugLogger.log(`⚠️ [TripService] Notification permission denied: ${result.status}`);
       
     } catch (error) {
-      console.error('💥 [TripService] Failed to request notification permissions:', error);
-      console.error('💥 [TripService] Notification error details:', error.message, error.stack);
+      debugLogger.log(`💥 [TripService] Failed to request notification permissions: ${error.message}`);
     }
   }
 

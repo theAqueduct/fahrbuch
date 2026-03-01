@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { TripService } from '../services/TripService';
+import { debugLogger } from '../services/ActivityService';
 import { Trip, ActivityType, TripStatus, TripPurpose } from '../types';
 
 interface ActivityState {
@@ -88,6 +89,16 @@ function ActivityDemoCore() {
       addDebugInfo('ERROR: TripService not initialized');
       return;
     }
+    
+    // Subscribe to debug logger to capture all service logs
+    const handleDebugLog = (message: string) => {
+      setState(prev => ({ 
+        ...prev, 
+        debugInfo: [...prev.debugInfo.slice(-19), `${new Date().toLocaleTimeString()}: ${message}`] 
+      }));
+    };
+    
+    debugLogger.addListener(handleDebugLog);
     
     addDebugInfo('useEffect running, starting initialization');
     initializeTracking();
