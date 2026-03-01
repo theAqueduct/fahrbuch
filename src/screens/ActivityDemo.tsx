@@ -17,9 +17,49 @@ interface ActivityState {
   lastActivity: string;
   currentSpeed: number;
   permissionStatus: 'checking' | 'granted' | 'denied' | 'critical';
+  error: string | null;
+  debugInfo: string[];
 }
 
-export default function ActivityDemo() {
+// Error boundary component
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error?: Error}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('💥 [ErrorBoundary] Caught error:', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('💥 [ErrorBoundary] Component crashed:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>🚨 App Crashed</Text>
+          <Text style={styles.errorMessage}>
+            {this.state.error?.message || 'Unknown error occurred'}
+          </Text>
+          <TouchableOpacity
+            style={styles.errorButton}
+            onPress={() => this.setState({ hasError: false })}
+          >
+            <Text style={styles.errorButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function ActivityDemoCore() {
   const [tripService] = useState(() => new TripService());
   const [state, setState] = useState<ActivityState>({
     isTracking: false,
@@ -28,34 +68,75 @@ export default function ActivityDemo() {
     lastActivity: 'Unknown',
     currentSpeed: 0,
     permissionStatus: 'checking',
+    error: null,
+    debugInfo: ['App started'],
   });
 
+  // Add debug info helper
+  const addDebugInfo = (info: string) => {
+    console.log(`🔍 [DEBUG] ${info}`);
+    setState(prev => ({ 
+      ...prev, 
+      debugInfo: [...prev.debugInfo.slice(-9), `${new Date().toLocaleTimeString()}: ${info}`] 
+    }));
+  };
+
   useEffect(() => {
+    // Defensive check
+    if (!tripService) {
+      console.error('💥 [ActivityDemo] TripService not initialized!');
+      addDebugInfo('ERROR: TripService not initialized');
+      return;
+    }
+    
+    addDebugInfo('useEffect running, starting initialization');
     initializeTracking();
     
     // Set up periodic permission retry if denied
     const permissionRetryInterval = setInterval(() => {
       if (state.permissionStatus === 'denied') {
         console.log('Retrying permissions due to critical need...');
+        addDebugInfo('Auto-retrying permissions');
         initializeTracking();
       }
     }, 30000); // Retry every 30 seconds
     
     return () => {
-      tripService.stop();
+      console.log('🧹 [ActivityDemo] Cleanup: stopping services...');
+      addDebugInfo('Cleanup: stopping services');
+      try {
+        tripService.stop();
+      } catch (error) {
+        console.error('Error stopping trip service:', error);
+      }
       clearInterval(permissionRetryInterval);
     };
   }, [state.permissionStatus]);
 
   const initializeTracking = async () => {
+    console.log('🚀 [ActivityDemo] Starting initialization...');
+    addDebugInfo('Starting initialization');
+    
     try {
+      setState(prev => ({ ...prev, permissionStatus: 'checking', error: null }));
+      addDebugInfo('Set status to checking');
+      
+      console.log('📱 [ActivityDemo] Set status to checking, calling tripService.initialize()...');
+      addDebugInfo('Calling tripService.initialize()');
+      
       const success = await tripService.initialize();
+      console.log('📋 [ActivityDemo] TripService initialize result:', success);
+      addDebugInfo(`TripService result: ${success}`);
       
       if (success) {
+        console.log('✅ [ActivityDemo] Success! Setting up tracking...');
+        addDebugInfo('Permissions granted, setting up tracking');
         setState(prev => ({ ...prev, isTracking: true, permissionStatus: 'granted' }));
         
         // Listen for trip events
         tripService.onTripEvent((trip: Trip) => {
+          console.log('🚗 [ActivityDemo] Trip event received:', trip.status, trip.id);
+          addDebugInfo(`Trip event: ${trip.status}`);
           setState(prev => ({
             ...prev,
             currentTrip: trip.status === TripStatus.ACTIVE ? trip : null,
@@ -66,27 +147,57 @@ export default function ActivityDemo() {
         });
 
         // Simulate activity updates (since we can't fully test on simulator)
+        console.log('🎭 [ActivityDemo] Starting activity simulation...');
+        addDebugInfo('Starting activity simulation');
         startActivitySimulation();
+        console.log('✅ [ActivityDemo] Initialization complete!');
+        addDebugInfo('Initialization complete!');
       } else {
         // Permissions failed - show critical alert
+        console.log('❌ [ActivityDemo] Permissions failed, showing alert...');
+        addDebugInfo('Permissions failed');
         setState(prev => ({ ...prev, permissionStatus: 'denied' }));
-        showPermissionCriticalAlert();
+        setTimeout(() => showPermissionCriticalAlert(), 100); // Delay to ensure state update
       }
     } catch (error) {
-      console.error('Failed to initialize tracking:', error);
+      console.error('💥 [ActivityDemo] CRITICAL ERROR in initialization:', error);
+      console.error('💥 [ActivityDemo] Error stack:', error.stack);
+      addDebugInfo(`CRITICAL ERROR: ${error.message}`);
       
-      if (error.message.includes('CRITICAL:')) {
+      // Set error state
+      setState(prev => ({ 
+        ...prev, 
+        permissionStatus: 'critical',
+        error: error.message || 'Unknown error'
+      }));
+      
+      if (error.message && error.message.includes('CRITICAL:')) {
         // Permission-related critical error
-        Alert.alert(
-          '🚨 LOCATION ACCESS REQUIRED',
-          error.message.replace('CRITICAL: ', '') + '\n\nFahrbuch cannot work without location permissions. Please restart and allow location access.',
-          [
-            { text: 'Open Settings', onPress: showPermissionSettings },
-            { text: 'Retry', onPress: initializeTracking }
-          ]
-        );
+        console.log('🚨 [ActivityDemo] Permission critical error, showing alert...');
+        addDebugInfo('Showing permission critical alert');
+        setTimeout(() => {
+          Alert.alert(
+            '🚨 LOCATION ACCESS REQUIRED',
+            error.message.replace('CRITICAL: ', '') + '\n\nFahrbuch cannot work without location permissions. Please restart and allow location access.',
+            [
+              { text: 'Open Settings', onPress: showPermissionSettings },
+              { text: 'Retry', onPress: initializeTracking }
+            ]
+          );
+        }, 100);
       } else {
-        Alert.alert('Error', 'Failed to initialize trip tracking.');
+        console.log('⚠️ [ActivityDemo] Generic error, showing basic alert...');
+        addDebugInfo('Showing generic error alert');
+        setTimeout(() => {
+          Alert.alert(
+            'Initialization Error', 
+            `Failed to initialize trip tracking.\n\nError: ${error.message || 'Unknown error'}\n\nPlease try again or restart the app.`,
+            [
+              { text: 'Retry', onPress: initializeTracking },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }, 100);
       }
     }
   };
@@ -281,6 +392,25 @@ export default function ActivityDemo() {
             </View>
           ))
         )}
+      </View>
+
+      {/* Debug Info */}
+      <View style={styles.debugCard}>
+        <Text style={styles.cardTitle}>🔍 Debug Log</Text>
+        {state.error && (
+          <Text style={styles.errorText}>ERROR: {state.error}</Text>
+        )}
+        <ScrollView style={styles.debugLog} nestedScrollEnabled={true}>
+          {state.debugInfo.map((info, index) => (
+            <Text key={index} style={styles.debugText}>{info}</Text>
+          ))}
+        </ScrollView>
+        <TouchableOpacity 
+          style={styles.debugButton}
+          onPress={() => setState(prev => ({ ...prev, debugInfo: ['Debug cleared'] }))}
+        >
+          <Text style={styles.debugButtonText}>Clear Log</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Instructions */}
@@ -481,4 +611,83 @@ const styles = StyleSheet.create({
     color: '#1976d2',
     textAlign: 'center',
   },
+  debugCard: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#9c27b0',
+    maxHeight: 200,
+  },
+  debugLog: {
+    maxHeight: 120,
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+  },
+  debugText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: '#333',
+    marginBottom: 2,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#f44336',
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  debugButton: {
+    backgroundColor: '#9c27b0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    alignSelf: 'flex-end',
+  },
+  debugButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#f44336',
+    marginBottom: 16,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  errorButton: {
+    backgroundColor: '#f44336',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  errorButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
+
+// Main export with error boundary
+export default function ActivityDemo() {
+  return (
+    <ErrorBoundary>
+      <ActivityDemoCore />
+    </ErrorBoundary>
+  );
+}

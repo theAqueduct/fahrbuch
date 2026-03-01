@@ -21,32 +21,47 @@ export class ActivityService {
     type: 'foreground' | 'background',
     requestFunction: () => Promise<{ status: string }>
   ): Promise<boolean> {
+    console.log(`🔄 [ActivityService] Starting aggressive permission request for ${type}...`);
+    
     const maxRetries = 5;
     let attempts = 0;
     
     while (attempts < maxRetries) {
       attempts++;
+      console.log(`📱 [ActivityService] Permission attempt ${attempts}/${maxRetries} for ${type}...`);
       
-      const { status } = await requestFunction();
-      
-      if (status === 'granted') {
-        return true;
+      try {
+        const result = await requestFunction();
+        console.log(`📋 [ActivityService] Permission result for ${type}:`, result);
+        
+        if (result.status === 'granted') {
+          console.log(`✅ [ActivityService] ${type} permission granted on attempt ${attempts}`);
+          return true;
+        }
+        
+        // Permission denied - show critical message and retry
+        const permissionName = type === 'foreground' ? 'Location Access' : 'Background Location';
+        const criticalMessage = 
+          `❗ FAHRBUCH CANNOT WORK WITHOUT ${permissionName.toUpperCase()}\n\n` +
+          `German tax law requires automatic mileage tracking.\n` +
+          `Without location access, you'll have to log trips manually.\n\n` +
+          `Attempt ${attempts}/${maxRetries}\n\n` +
+          `Please tap "Allow" to continue.`;
+        
+        console.warn(`⚠️ [ActivityService] ${type} permission denied (attempt ${attempts}):`, result.status);
+        console.error(`CRITICAL PERMISSION NEEDED: ${criticalMessage}`);
+        
+        // Add delay between retries
+        console.log(`⏳ [ActivityService] Waiting 2 seconds before retry...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.error(`💥 [ActivityService] Error requesting ${type} permission on attempt ${attempts}:`, error);
+        console.error(`💥 [ActivityService] Error details:`, error.message, error.stack);
+        
+        // If there's an error requesting permissions, wait and try again
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      
-      // Permission denied - show critical message and retry
-      const permissionName = type === 'foreground' ? 'Location Access' : 'Background Location';
-      const criticalMessage = 
-        `❗ FAHRBUCH CANNOT WORK WITHOUT ${permissionName.toUpperCase()}\n\n` +
-        `German tax law requires automatic mileage tracking.\n` +
-        `Without location access, you'll have to log trips manually.\n\n` +
-        `Attempt ${attempts}/${maxRetries}\n\n` +
-        `Please tap "Allow" to continue.`;
-      
-      // In a real app, you'd show a modal here
-      console.error(`CRITICAL PERMISSION NEEDED: ${criticalMessage}`);
-      
-      // Add delay between retries
-      await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
     // Final attempt failed - show settings redirect message
@@ -60,29 +75,47 @@ export class ActivityService {
       `4. Set to "Always" for background tracking\n\n` +
       `The app will restart when you return.`;
     
+    console.error(`❌ [ActivityService] Final failure for ${type} permission after ${maxRetries} attempts`);
     console.error(`SETTINGS REDIRECT NEEDED: ${settingsMessage}`);
     return false;
   }
 
   // Start monitoring device activity - AGGRESSIVE PERMISSION STRATEGY
   async startMonitoring(): Promise<boolean> {
-    // Critical permissions required - app cannot function without them
-    const foregroundResult = await this.requestPermissionAggressively(
-      'foreground', 
-      () => Location.requestForegroundPermissionsAsync()
-    );
+    console.log('🔍 [ActivityService] Starting monitoring, requesting permissions...');
     
-    if (!foregroundResult) {
-      throw new Error('CRITICAL: Location access required for mileage tracking');
-    }
+    try {
+      // Critical permissions required - app cannot function without them
+      console.log('📍 [ActivityService] Requesting foreground location permissions...');
+      const foregroundResult = await this.requestPermissionAggressively(
+        'foreground', 
+        () => Location.requestForegroundPermissionsAsync()
+      );
+      
+      console.log('📍 [ActivityService] Foreground result:', foregroundResult);
+      
+      if (!foregroundResult) {
+        console.log('❌ [ActivityService] Foreground permission denied, throwing error...');
+        throw new Error('CRITICAL: Location access required for mileage tracking');
+      }
 
-    const backgroundResult = await this.requestPermissionAggressively(
-      'background',
-      () => Location.requestBackgroundPermissionsAsync()
-    );
-    
-    if (!backgroundResult) {
-      throw new Error('CRITICAL: Background location required for automatic trip detection');
+      console.log('🔒 [ActivityService] Requesting background location permissions...');
+      const backgroundResult = await this.requestPermissionAggressively(
+        'background',
+        () => Location.requestBackgroundPermissionsAsync()
+      );
+      
+      console.log('🔒 [ActivityService] Background result:', backgroundResult);
+      
+      if (!backgroundResult) {
+        console.log('❌ [ActivityService] Background permission denied, throwing error...');
+        throw new Error('CRITICAL: Background location required for automatic trip detection');
+      }
+
+      console.log('✅ [ActivityService] Both permissions granted, starting services...');
+    } catch (permissionError) {
+      console.error('💥 [ActivityService] Permission error:', permissionError);
+      throw permissionError; // Re-throw permission errors
     }
 
     try {
