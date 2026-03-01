@@ -16,76 +16,92 @@ export class ActivityService {
     this.setupMotionDetection();
   }
 
-  // AGGRESSIVE permission strategy - retry until granted
+  // Check and log current permission status for debugging
+  private async logCurrentPermissionStatus(): Promise<void> {
+    try {
+      console.log('🔍 [ActivityService] Checking current permission status...');
+      
+      // Check foreground location permission
+      const foregroundStatus = await Location.getForegroundPermissionsAsync();
+      console.log('📍 [ActivityService] Current foreground location status:', JSON.stringify(foregroundStatus));
+      
+      // Check background location permission  
+      const backgroundStatus = await Location.getBackgroundPermissionsAsync();
+      console.log('🔒 [ActivityService] Current background location status:', JSON.stringify(backgroundStatus));
+      
+      // Check if location services are enabled on device
+      const isLocationEnabled = await Location.hasServicesEnabledAsync();
+      console.log('🌍 [ActivityService] Location services enabled on device:', isLocationEnabled);
+      
+    } catch (error) {
+      console.error('💥 [ActivityService] Error checking permission status:', error);
+    }
+  }
+
+  // iOS-FRIENDLY permission strategy - single request with clear messaging  
   private async requestPermissionAggressively(
     type: 'foreground' | 'background',
     requestFunction: () => Promise<{ status: string }>
   ): Promise<boolean> {
-    console.log(`🔄 [ActivityService] Starting aggressive permission request for ${type}...`);
-    
-    const maxRetries = 5;
-    let attempts = 0;
-    
-    while (attempts < maxRetries) {
-      attempts++;
-      console.log(`📱 [ActivityService] Permission attempt ${attempts}/${maxRetries} for ${type}...`);
-      
-      try {
-        const result = await requestFunction();
-        console.log(`📋 [ActivityService] Permission result for ${type}:`, result);
-        
-        if (result.status === 'granted') {
-          console.log(`✅ [ActivityService] ${type} permission granted on attempt ${attempts}`);
-          return true;
-        }
-        
-        // Permission denied - show critical message and retry
-        const permissionName = type === 'foreground' ? 'Location Access' : 'Background Location';
-        const criticalMessage = 
-          `❗ FAHRBUCH CANNOT WORK WITHOUT ${permissionName.toUpperCase()}\n\n` +
-          `German tax law requires automatic mileage tracking.\n` +
-          `Without location access, you'll have to log trips manually.\n\n` +
-          `Attempt ${attempts}/${maxRetries}\n\n` +
-          `Please tap "Allow" to continue.`;
-        
-        console.warn(`⚠️ [ActivityService] ${type} permission denied (attempt ${attempts}):`, result.status);
-        console.error(`CRITICAL PERMISSION NEEDED: ${criticalMessage}`);
-        
-        // Add delay between retries
-        console.log(`⏳ [ActivityService] Waiting 2 seconds before retry...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-      } catch (error) {
-        console.error(`💥 [ActivityService] Error requesting ${type} permission on attempt ${attempts}:`, error);
-        console.error(`💥 [ActivityService] Error details:`, error.message, error.stack);
-        
-        // If there's an error requesting permissions, wait and try again
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    // Final attempt failed - show settings redirect message
-    const settingsMessage = 
-      `❌ PERMISSION REQUIRED\n\n` +
-      `Fahrbuch requires location access to automatically track your drives.\n\n` +
-      `Please:\n` +
-      `1. Open Settings\n` +
-      `2. Find Fahrbuch app\n` +
-      `3. Enable Location permissions\n` +
-      `4. Set to "Always" for background tracking\n\n` +
-      `The app will restart when you return.`;
-    
-    console.error(`❌ [ActivityService] Final failure for ${type} permission after ${maxRetries} attempts`);
-    console.error(`SETTINGS REDIRECT NEEDED: ${settingsMessage}`);
-    return false;
-  }
-
-  // Start monitoring device activity - AGGRESSIVE PERMISSION STRATEGY
-  async startMonitoring(): Promise<boolean> {
-    console.log('🔍 [ActivityService] Starting monitoring, requesting permissions...');
+    console.log(`🔄 [ActivityService] Requesting ${type} permission (iOS-friendly)...`);
     
     try {
-      // Critical permissions required - app cannot function without them
+      const result = await requestFunction();
+      console.log(`📋 [ActivityService] Permission result for ${type}:`, JSON.stringify(result));
+      
+      if (result.status === 'granted') {
+        console.log(`✅ [ActivityService] ${type} permission granted!`);
+        return true;
+      }
+      
+      // Log the specific denial reason
+      console.warn(`⚠️ [ActivityService] ${type} permission denied:`, result.status);
+      
+      // Different messages based on permission type and status
+      if (result.status === 'denied') {
+        console.error(`❌ [ActivityService] ${type} permission permanently denied by user`);
+      } else if (result.status === 'undetermined') {
+        console.error(`❓ [ActivityService] ${type} permission undetermined - user hasn't decided yet`);
+      } else {
+        console.error(`⚠️ [ActivityService] ${type} permission status: ${result.status}`);
+      }
+      
+      // Show user-friendly message
+      const permissionName = type === 'foreground' ? 'Location Access' : 'Background Location';
+      const settingsMessage = 
+        `❌ ${permissionName.toUpperCase()} REQUIRED\n\n` +
+        `Status: ${result.status}\n\n` +
+        `Fahrbuch needs location access for German tax-compliant mileage tracking.\n\n` +
+        `To enable:\n` +
+        `1. Open iOS Settings\n` +
+        `2. Find "Fahrbuch" app\n` +
+        `3. Tap "Location"\n` +
+        `4. Select "Always" (for background tracking)\n\n` +
+        `The app will work once permissions are granted.`;
+      
+      console.error(`SETTINGS REQUIRED: ${settingsMessage}`);
+      return false;
+      
+    } catch (error) {
+      console.error(`💥 [ActivityService] Error requesting ${type} permission:`, error);
+      console.error(`💥 [ActivityService] Error message:`, error.message);
+      console.error(`💥 [ActivityService] Error stack:`, error.stack);
+      
+      // Permission API itself failed
+      console.error(`💥 [ActivityService] Permission API failed for ${type} - this suggests a code issue`);
+      return false;
+    }
+  }
+
+  // Start monitoring device activity - iOS-FRIENDLY PERMISSION STRATEGY
+  async startMonitoring(): Promise<boolean> {
+    console.log('🔍 [ActivityService] Starting monitoring, checking current permissions...');
+    
+    try {
+      // Check current permission status first
+      await this.logCurrentPermissionStatus();
+      
+      // Request foreground permissions
       console.log('📍 [ActivityService] Requesting foreground location permissions...');
       const foregroundResult = await this.requestPermissionAggressively(
         'foreground', 
@@ -95,8 +111,8 @@ export class ActivityService {
       console.log('📍 [ActivityService] Foreground result:', foregroundResult);
       
       if (!foregroundResult) {
-        console.log('❌ [ActivityService] Foreground permission denied, throwing error...');
-        throw new Error('CRITICAL: Location access required for mileage tracking');
+        console.log('❌ [ActivityService] Foreground permission denied - app cannot track location');
+        return false; // Return false instead of throwing
       }
 
       console.log('🔒 [ActivityService] Requesting background location permissions...');
@@ -108,19 +124,20 @@ export class ActivityService {
       console.log('🔒 [ActivityService] Background result:', backgroundResult);
       
       if (!backgroundResult) {
-        console.log('❌ [ActivityService] Background permission denied, throwing error...');
-        throw new Error('CRITICAL: Background location required for automatic trip detection');
+        console.log('⚠️ [ActivityService] Background permission denied - trips may not auto-detect when app is closed');
+        // Continue without background - app can still work in foreground
       }
 
-      console.log('✅ [ActivityService] Both permissions granted, starting services...');
+      console.log('✅ [ActivityService] Permissions processed, starting services...');
     } catch (permissionError) {
       console.error('💥 [ActivityService] Permission error:', permissionError);
-      throw permissionError; // Re-throw permission errors
+      return false; // Return false instead of throwing
     }
 
     try {
 
       // Start location tracking
+      console.log('🌍 [ActivityService] Starting location tracking...');
       this.locationSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
@@ -129,16 +146,20 @@ export class ActivityService {
         },
         this.handleLocationUpdate.bind(this)
       );
+      console.log('✅ [ActivityService] Location tracking started');
 
       // Start motion sensor
+      console.log('📱 [ActivityService] Starting motion sensor...');
       DeviceMotion.setUpdateInterval(1000); // 1 second
       DeviceMotion.addListener(this.handleMotionUpdate.bind(this));
+      console.log('✅ [ActivityService] Motion sensor started');
 
       this.isMonitoring = true;
-      console.log('Activity monitoring started');
+      console.log('✅ [ActivityService] Activity monitoring started successfully');
       return true;
-    } catch (error) {
-      console.error('Failed to start activity monitoring:', error);
+    } catch (serviceError) {
+      console.error('💥 [ActivityService] Failed to start activity monitoring services:', serviceError);
+      console.error('💥 [ActivityService] Service error stack:', serviceError.stack);
       return false;
     }
   }

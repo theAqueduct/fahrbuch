@@ -29,57 +29,64 @@ export class TripService {
   }
 
   async initialize(): Promise<boolean> {
-    // AGGRESSIVE: Request notification permissions first
-    await this.requestNotificationPermissionsAggressively();
+    console.log('🚀 [TripService] Initialize called');
     
-    const success = await this.activityService.startMonitoring();
-    if (success) {
-      this.isTracking = true;
-      console.log('TripService initialized and tracking started');
-    }
-    return success;
-  }
-
-  // AGGRESSIVE notification permission strategy
-  private async requestNotificationPermissionsAggressively(): Promise<void> {
     try {
-      const maxRetries = 3;
-      let attempts = 0;
+      // AGGRESSIVE: Request notification permissions first
+      console.log('📢 [TripService] Requesting notification permissions...');
+      await this.requestNotificationPermissionsAggressively();
+      console.log('✅ [TripService] Notification permissions done');
       
-      while (attempts < maxRetries) {
-        attempts++;
-        
-        const { status } = await Notifications.requestPermissionsAsync();
-        
-        if (status === 'granted') {
-          console.log('Notification permissions granted');
-          return;
-        }
-        
-        // Show critical message for notification permissions
-        const message = 
-          `🔔 NOTIFICATIONS REQUIRED\n\n` +
-          `Fahrbuch needs notification access to:\n` +
-          `• Alert you when trips end\n` +
-          `• Let you tag trips immediately\n` +
-          `• Maintain accurate mileage logs\n\n` +
-          `Attempt ${attempts}/${maxRetries}`;
-        
-        console.warn(`NOTIFICATION PERMISSION NEEDED: ${message}`);
-        
-        // Delay between retries
-        await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log('📍 [TripService] Starting ActivityService monitoring...');
+      const success = await this.activityService.startMonitoring();
+      console.log('📍 [TripService] ActivityService monitoring result:', success);
+      
+      if (success) {
+        this.isTracking = true;
+        console.log('✅ [TripService] TripService initialized and tracking started');
+      } else {
+        console.log('❌ [TripService] ActivityService monitoring failed');
       }
       
-      // Final warning
-      console.error(
-        '❌ NOTIFICATION ACCESS DENIED\n\n' +
-        'Trip notifications disabled. You must manually check for completed trips.\n' +
-        'Enable notifications in Settings for best experience.'
-      );
+      return success;
+    } catch (error) {
+      console.error('💥 [TripService] Error during initialization:', error);
+      console.error('💥 [TripService] Error stack:', error.stack);
+      return false;
+    }
+  }
+
+  // iOS-FRIENDLY notification permission strategy
+  private async requestNotificationPermissionsAggressively(): Promise<void> {
+    try {
+      console.log('🔔 [TripService] Requesting notification permissions...');
+      
+      const result = await Notifications.requestPermissionsAsync();
+      console.log('🔔 [TripService] Notification permission result:', JSON.stringify(result));
+      
+      if (result.status === 'granted') {
+        console.log('✅ [TripService] Notification permissions granted');
+        return;
+      }
+      
+      // Log specific denial reason
+      console.warn(`⚠️ [TripService] Notification permission denied: ${result.status}`);
+      
+      // Show user-friendly message
+      const message = 
+        `🔔 NOTIFICATIONS RECOMMENDED\n\n` +
+        `Status: ${result.status}\n\n` +
+        `Notifications help you:\n` +
+        `• Get alerted when trips end\n` +
+        `• Tag trips immediately for accuracy\n` +
+        `• Maintain complete mileage logs\n\n` +
+        `You can enable in Settings > Notifications > Fahrbuch later.`;
+      
+      console.warn(`NOTIFICATION INFO: ${message}`);
       
     } catch (error) {
-      console.error('Failed to request notification permissions:', error);
+      console.error('💥 [TripService] Failed to request notification permissions:', error);
+      console.error('💥 [TripService] Notification error details:', error.message, error.stack);
     }
   }
 
