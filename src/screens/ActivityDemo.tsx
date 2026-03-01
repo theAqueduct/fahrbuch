@@ -16,6 +16,7 @@ interface ActivityState {
   tripHistory: Trip[];
   lastActivity: string;
   currentSpeed: number;
+  permissionStatus: 'checking' | 'granted' | 'denied' | 'critical';
 }
 
 export default function ActivityDemo() {
@@ -26,22 +27,32 @@ export default function ActivityDemo() {
     tripHistory: [],
     lastActivity: 'Unknown',
     currentSpeed: 0,
+    permissionStatus: 'checking',
   });
 
   useEffect(() => {
     initializeTracking();
     
+    // Set up periodic permission retry if denied
+    const permissionRetryInterval = setInterval(() => {
+      if (state.permissionStatus === 'denied') {
+        console.log('Retrying permissions due to critical need...');
+        initializeTracking();
+      }
+    }, 30000); // Retry every 30 seconds
+    
     return () => {
       tripService.stop();
+      clearInterval(permissionRetryInterval);
     };
-  }, []);
+  }, [state.permissionStatus]);
 
   const initializeTracking = async () => {
     try {
       const success = await tripService.initialize();
       
       if (success) {
-        setState(prev => ({ ...prev, isTracking: true }));
+        setState(prev => ({ ...prev, isTracking: true, permissionStatus: 'granted' }));
         
         // Listen for trip events
         tripService.onTripEvent((trip: Trip) => {
@@ -57,12 +68,58 @@ export default function ActivityDemo() {
         // Simulate activity updates (since we can't fully test on simulator)
         startActivitySimulation();
       } else {
-        Alert.alert('Error', 'Failed to start location tracking. Please check permissions.');
+        // Permissions failed - show critical alert
+        setState(prev => ({ ...prev, permissionStatus: 'denied' }));
+        showPermissionCriticalAlert();
       }
     } catch (error) {
       console.error('Failed to initialize tracking:', error);
-      Alert.alert('Error', 'Failed to initialize trip tracking.');
+      
+      if (error.message.includes('CRITICAL:')) {
+        // Permission-related critical error
+        Alert.alert(
+          '🚨 LOCATION ACCESS REQUIRED',
+          error.message.replace('CRITICAL: ', '') + '\n\nFahrbuch cannot work without location permissions. Please restart and allow location access.',
+          [
+            { text: 'Open Settings', onPress: showPermissionSettings },
+            { text: 'Retry', onPress: initializeTracking }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to initialize trip tracking.');
+      }
     }
+  };
+
+  const showPermissionCriticalAlert = () => {
+    Alert.alert(
+      '❗ FAHRBUCH REQUIRES LOCATION ACCESS',
+      'German tax compliance requires automatic mileage tracking.\n\n' +
+      'Without location permissions:\n' +
+      '• No automatic trip detection\n' +
+      '• Manual logging only\n' +
+      '• Tax audit risks\n\n' +
+      'Please enable location access to continue.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: showPermissionSettings },
+        { text: 'Try Again', onPress: initializeTracking }
+      ]
+    );
+  };
+
+  const showPermissionSettings = () => {
+    Alert.alert(
+      '📱 Enable Location in Settings',
+      'To enable automatic mileage tracking:\n\n' +
+      '1. Open iOS Settings\n' +
+      '2. Scroll to "Fahrbuch"\n' +
+      '3. Tap "Location"\n' +
+      '4. Select "Always"\n' +
+      '5. Return to app\n\n' +
+      'This enables background tracking for accurate mileage logs.',
+      [{ text: 'Got it', onPress: () => {} }]
+    );
   };
 
   const startActivitySimulation = () => {
@@ -123,6 +180,29 @@ export default function ActivityDemo() {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Fahrbuch - Activity Demo</Text>
+      
+      {/* Permission Status Banner */}
+      {state.permissionStatus === 'denied' && (
+        <View style={styles.criticalBanner}>
+          <Text style={styles.criticalTitle}>🚨 LOCATION ACCESS REQUIRED</Text>
+          <Text style={styles.criticalText}>
+            Fahrbuch cannot track mileage without location permissions.
+            This is required for German tax compliance.
+          </Text>
+          <TouchableOpacity 
+            style={styles.criticalButton}
+            onPress={showPermissionSettings}
+          >
+            <Text style={styles.criticalButtonText}>ENABLE LOCATION ACCESS</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {state.permissionStatus === 'checking' && (
+        <View style={styles.checkingBanner}>
+          <Text style={styles.checkingText}>🔍 Requesting location permissions...</Text>
+        </View>
+      )}
       
       {/* Current Status */}
       <View style={styles.statusCard}>
@@ -355,5 +435,50 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#666',
     marginTop: 8,
+  },
+  criticalBanner: {
+    backgroundColor: '#ffebee',
+    borderLeftWidth: 6,
+    borderLeftColor: '#f44336',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 8,
+  },
+  criticalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#c62828',
+    marginBottom: 8,
+  },
+  criticalText: {
+    fontSize: 14,
+    color: '#d32f2f',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  criticalButton: {
+    backgroundColor: '#f44336',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  criticalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  checkingBanner: {
+    backgroundColor: '#e3f2fd',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196f3',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 8,
+  },
+  checkingText: {
+    fontSize: 16,
+    color: '#1976d2',
+    textAlign: 'center',
   },
 });

@@ -16,21 +16,76 @@ export class ActivityService {
     this.setupMotionDetection();
   }
 
-  // Start monitoring device activity
-  async startMonitoring(): Promise<boolean> {
-    try {
-      // Request permissions
-      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
-      if (locationStatus !== 'granted') {
-        console.warn('Location permission not granted');
-        return false;
+  // AGGRESSIVE permission strategy - retry until granted
+  private async requestPermissionAggressively(
+    type: 'foreground' | 'background',
+    requestFunction: () => Promise<{ status: string }>
+  ): Promise<boolean> {
+    const maxRetries = 5;
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+      attempts++;
+      
+      const { status } = await requestFunction();
+      
+      if (status === 'granted') {
+        return true;
       }
+      
+      // Permission denied - show critical message and retry
+      const permissionName = type === 'foreground' ? 'Location Access' : 'Background Location';
+      const criticalMessage = 
+        `❗ FAHRBUCH CANNOT WORK WITHOUT ${permissionName.toUpperCase()}\n\n` +
+        `German tax law requires automatic mileage tracking.\n` +
+        `Without location access, you'll have to log trips manually.\n\n` +
+        `Attempt ${attempts}/${maxRetries}\n\n` +
+        `Please tap "Allow" to continue.`;
+      
+      // In a real app, you'd show a modal here
+      console.error(`CRITICAL PERMISSION NEEDED: ${criticalMessage}`);
+      
+      // Add delay between retries
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    // Final attempt failed - show settings redirect message
+    const settingsMessage = 
+      `❌ PERMISSION REQUIRED\n\n` +
+      `Fahrbuch requires location access to automatically track your drives.\n\n` +
+      `Please:\n` +
+      `1. Open Settings\n` +
+      `2. Find Fahrbuch app\n` +
+      `3. Enable Location permissions\n` +
+      `4. Set to "Always" for background tracking\n\n` +
+      `The app will restart when you return.`;
+    
+    console.error(`SETTINGS REDIRECT NEEDED: ${settingsMessage}`);
+    return false;
+  }
 
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus !== 'granted') {
-        console.warn('Background location permission not granted');
-        return false;
-      }
+  // Start monitoring device activity - AGGRESSIVE PERMISSION STRATEGY
+  async startMonitoring(): Promise<boolean> {
+    // Critical permissions required - app cannot function without them
+    const foregroundResult = await this.requestPermissionAggressively(
+      'foreground', 
+      () => Location.requestForegroundPermissionsAsync()
+    );
+    
+    if (!foregroundResult) {
+      throw new Error('CRITICAL: Location access required for mileage tracking');
+    }
+
+    const backgroundResult = await this.requestPermissionAggressively(
+      'background',
+      () => Location.requestBackgroundPermissionsAsync()
+    );
+    
+    if (!backgroundResult) {
+      throw new Error('CRITICAL: Background location required for automatic trip detection');
+    }
+
+    try {
 
       // Start location tracking
       this.locationSubscription = await Location.watchPositionAsync(

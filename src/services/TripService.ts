@@ -29,12 +29,58 @@ export class TripService {
   }
 
   async initialize(): Promise<boolean> {
+    // AGGRESSIVE: Request notification permissions first
+    await this.requestNotificationPermissionsAggressively();
+    
     const success = await this.activityService.startMonitoring();
     if (success) {
       this.isTracking = true;
       console.log('TripService initialized and tracking started');
     }
     return success;
+  }
+
+  // AGGRESSIVE notification permission strategy
+  private async requestNotificationPermissionsAggressively(): Promise<void> {
+    try {
+      const maxRetries = 3;
+      let attempts = 0;
+      
+      while (attempts < maxRetries) {
+        attempts++;
+        
+        const { status } = await Notifications.requestPermissionsAsync();
+        
+        if (status === 'granted') {
+          console.log('Notification permissions granted');
+          return;
+        }
+        
+        // Show critical message for notification permissions
+        const message = 
+          `🔔 NOTIFICATIONS REQUIRED\n\n` +
+          `Fahrbuch needs notification access to:\n` +
+          `• Alert you when trips end\n` +
+          `• Let you tag trips immediately\n` +
+          `• Maintain accurate mileage logs\n\n` +
+          `Attempt ${attempts}/${maxRetries}`;
+        
+        console.warn(`NOTIFICATION PERMISSION NEEDED: ${message}`);
+        
+        // Delay between retries
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      
+      // Final warning
+      console.error(
+        '❌ NOTIFICATION ACCESS DENIED\n\n' +
+        'Trip notifications disabled. You must manually check for completed trips.\n' +
+        'Enable notifications in Settings for best experience.'
+      );
+      
+    } catch (error) {
+      console.error('Failed to request notification permissions:', error);
+    }
   }
 
   stop(): void {
