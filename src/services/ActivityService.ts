@@ -29,10 +29,6 @@ export class ActivityService {
       const backgroundStatus = await Location.getBackgroundPermissionsAsync();
       console.log('🔒 [ActivityService] Current background location status:', JSON.stringify(backgroundStatus));
       
-      // Check if location services are enabled on device
-      const isLocationEnabled = await Location.hasServicesEnabledAsync();
-      console.log('🌍 [ActivityService] Location services enabled on device:', isLocationEnabled);
-      
     } catch (error) {
       console.error('💥 [ActivityService] Error checking permission status:', error);
     }
