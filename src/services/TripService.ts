@@ -23,9 +23,25 @@ export class TripService {
   private lastSignificantLocation: LocationType | null = null;
 
   constructor() {
-    this.activityService = new ActivityService();
-    this.setupNotifications();
-    this.setupActivityMonitoring();
+    debugLogger.log('🏗️ [TripService] Constructor starting...');
+    try {
+      debugLogger.log('🔧 [TripService] Creating ActivityService...');
+      this.activityService = new ActivityService();
+      debugLogger.log('✅ [TripService] ActivityService created successfully');
+      
+      debugLogger.log('🔔 [TripService] Setting up notifications...');
+      this.setupNotifications();
+      debugLogger.log('✅ [TripService] Notifications setup complete');
+      
+      debugLogger.log('🎯 [TripService] Setting up activity monitoring...');
+      this.setupActivityMonitoring();
+      debugLogger.log('✅ [TripService] Activity monitoring setup complete');
+      
+      debugLogger.log('🎉 [TripService] Constructor completed successfully');
+    } catch (error) {
+      debugLogger.log(`💀 [TripService] Constructor failed: ${error.message}`);
+      throw error;
+    }
   }
 
   async initialize(): Promise<boolean> {
@@ -37,9 +53,17 @@ export class TripService {
       await this.requestNotificationPermissionsAggressively();
       debugLogger.log('✅ [TripService] Notification permissions done');
       
-      debugLogger.log('📍 [TripService] Starting ActivityService monitoring...');
+      debugLogger.log('📍 [TripService] About to call activityService.startMonitoring()...');
+      
+      // Verify ActivityService exists
+      if (!this.activityService) {
+        debugLogger.log('💀 [TripService] ERROR: activityService is null/undefined!');
+        return false;
+      }
+      
+      debugLogger.log('📍 [TripService] ActivityService exists, calling startMonitoring()...');
       const success = await this.activityService.startMonitoring();
-      debugLogger.log(`📍 [TripService] ActivityService monitoring result: ${success}`);
+      debugLogger.log(`📍 [TripService] startMonitoring() returned: ${success}`);
       
       if (success) {
         this.isTracking = true;

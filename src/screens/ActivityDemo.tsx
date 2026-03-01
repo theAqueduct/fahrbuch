@@ -61,7 +61,12 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 }
 
 function ActivityDemoCore() {
-  const [tripService] = useState(() => new TripService());
+  const [tripService] = useState(() => {
+    debugLogger.log('🏗️ [ActivityDemo] Creating TripService instance...');
+    const service = new TripService();
+    debugLogger.log('✅ [ActivityDemo] TripService instance created');
+    return service;
+  });
   const [state, setState] = useState<ActivityState>({
     isTracking: false,
     currentTrip: null,
@@ -83,12 +88,17 @@ function ActivityDemoCore() {
   };
 
   useEffect(() => {
+    debugLogger.log('🚀 [ActivityDemo] === USEEFFECT STARTING ===');
+    
     // Defensive check
     if (!tripService) {
       console.error('💥 [ActivityDemo] TripService not initialized!');
       addDebugInfo('ERROR: TripService not initialized');
+      debugLogger.log('💀 [ActivityDemo] TripService not initialized');
       return;
     }
+    
+    debugLogger.log('✅ [ActivityDemo] TripService exists, setting up debug listener...');
     
     // Subscribe to debug logger to capture all service logs
     const handleDebugLog = (message: string) => {
@@ -99,8 +109,10 @@ function ActivityDemoCore() {
     };
     
     debugLogger.addListener(handleDebugLog);
+    debugLogger.log('🔗 [ActivityDemo] Debug listener added');
     
     addDebugInfo('useEffect running, starting initialization');
+    debugLogger.log('📞 [ActivityDemo] About to call initializeTracking...');
     initializeTracking();
     
     // Set up periodic permission retry if denied
