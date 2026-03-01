@@ -29,25 +29,34 @@ export class ActivityService {
   private locationSubscription: Location.LocationSubscription | null = null;
   
   constructor() {
-    debugLogger.log('🏗️ [ActivityService] Constructor called');
-    this.setupMotionDetection();
+    console.log('🏗️ [ActivityService] === CONSTRUCTOR CALLED ===');
+    try {
+      console.log('📱 [ActivityService] Setting up motion detection...');
+      this.setupMotionDetection();
+      console.log('✅ [ActivityService] Constructor completed successfully');
+    } catch (error) {
+      console.error('💀 [ActivityService] Constructor failed:', error);
+      throw error;
+    }
   }
 
   // Check and log current permission status for debugging
   private async logCurrentPermissionStatus(): Promise<void> {
+    console.log('🔍 [ActivityService] === CHECKING PERMISSION STATUS ===');
+    
     try {
-      debugLogger.log('🔍 [ActivityService] Checking current permission status...');
-      
       // Check foreground location permission
+      console.log('📍 [ActivityService] Getting foreground permissions...');
       const foregroundStatus = await Location.getForegroundPermissionsAsync();
-      debugLogger.log(`📍 [ActivityService] Current foreground location status: ${JSON.stringify(foregroundStatus)}`);
+      console.log(`📍 [ActivityService] Foreground status: ${JSON.stringify(foregroundStatus)}`);
       
       // Check background location permission  
+      console.log('🔒 [ActivityService] Getting background permissions...');
       const backgroundStatus = await Location.getBackgroundPermissionsAsync();
-      debugLogger.log(`🔒 [ActivityService] Current background location status: ${JSON.stringify(backgroundStatus)}`);
+      console.log(`🔒 [ActivityService] Background status: ${JSON.stringify(backgroundStatus)}`);
       
     } catch (error) {
-      debugLogger.log(`💥 [ActivityService] Error checking permission status: ${error.message}`);
+      console.error(`💥 [ActivityService] Error checking permission status:`, error);
     }
   }
 
@@ -90,10 +99,10 @@ export class ActivityService {
 
   // Start monitoring device activity - COMPLETELY REWRITTEN WITH STEP-BY-STEP LOGGING
   async startMonitoring(): Promise<boolean> {
+    console.log('🚀 [ActivityService] === START MONITORING CALLED ===');
+    
     try {
-      debugLogger.log('🚀 [ActivityService] === START MONITORING CALLED ===');
-      
-      debugLogger.log('🔍 [ActivityService] Step 1: Checking current permissions...');
+      console.log('🔍 [ActivityService] Step 1: Checking current permissions...');
       await this.logCurrentPermissionStatus();
       
       debugLogger.log('📍 [ActivityService] Step 2: Requesting foreground location permissions...');

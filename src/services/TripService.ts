@@ -23,58 +23,57 @@ export class TripService {
   private lastSignificantLocation: LocationType | null = null;
 
   constructor() {
-    debugLogger.log('🏗️ [TripService] Constructor starting...');
+    console.log('🏗️ [TripService] === CONSTRUCTOR STARTING ===');
     try {
-      debugLogger.log('🔧 [TripService] Creating ActivityService...');
+      console.log('🔧 [TripService] Creating ActivityService...');
       this.activityService = new ActivityService();
-      debugLogger.log('✅ [TripService] ActivityService created successfully');
+      console.log('✅ [TripService] ActivityService created successfully');
       
-      debugLogger.log('🔔 [TripService] Setting up notifications...');
+      console.log('🔔 [TripService] Setting up notifications...');
       this.setupNotifications();
-      debugLogger.log('✅ [TripService] Notifications setup complete');
+      console.log('✅ [TripService] Notifications setup complete');
       
-      debugLogger.log('🎯 [TripService] Setting up activity monitoring...');
+      console.log('🎯 [TripService] Setting up activity monitoring...');
       this.setupActivityMonitoring();
-      debugLogger.log('✅ [TripService] Activity monitoring setup complete');
+      console.log('✅ [TripService] Activity monitoring setup complete');
       
-      debugLogger.log('🎉 [TripService] Constructor completed successfully');
+      console.log('🎉 [TripService] Constructor completed successfully');
     } catch (error) {
-      debugLogger.log(`💀 [TripService] Constructor failed: ${error.message}`);
+      console.error(`💀 [TripService] Constructor failed:`, error);
       throw error;
     }
   }
 
   async initialize(): Promise<boolean> {
-    debugLogger.log('🚀 [TripService] Initialize called');
+    console.log('🚀 [TripService] === INITIALIZE CALLED ===');
     
     try {
-      // AGGRESSIVE: Request notification permissions first
-      debugLogger.log('📢 [TripService] Requesting notification permissions...');
+      console.log('📢 [TripService] Requesting notification permissions...');
       await this.requestNotificationPermissionsAggressively();
-      debugLogger.log('✅ [TripService] Notification permissions done');
+      console.log('✅ [TripService] Notification permissions completed');
       
-      debugLogger.log('📍 [TripService] About to call activityService.startMonitoring()...');
+      console.log('📍 [TripService] About to call activityService.startMonitoring()...');
       
       // Verify ActivityService exists
       if (!this.activityService) {
-        debugLogger.log('💀 [TripService] ERROR: activityService is null/undefined!');
+        console.error('💀 [TripService] ERROR: activityService is null/undefined!');
         return false;
       }
       
-      debugLogger.log('📍 [TripService] ActivityService exists, calling startMonitoring()...');
+      console.log('📍 [TripService] ActivityService exists, calling startMonitoring()...');
       const success = await this.activityService.startMonitoring();
-      debugLogger.log(`📍 [TripService] startMonitoring() returned: ${success}`);
+      console.log(`📍 [TripService] startMonitoring() returned: ${success}`);
       
       if (success) {
         this.isTracking = true;
-        debugLogger.log('✅ [TripService] TripService initialized and tracking started');
+        console.log('✅ [TripService] TripService initialized and tracking started');
       } else {
-        debugLogger.log('❌ [TripService] ActivityService monitoring failed');
+        console.log('❌ [TripService] ActivityService monitoring failed');
       }
       
       return success;
     } catch (error) {
-      debugLogger.log(`💥 [TripService] Error during initialization: ${error.message}`);
+      console.error(`💥 [TripService] Error during initialization:`, error);
       return false;
     }
   }

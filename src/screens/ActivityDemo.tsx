@@ -62,10 +62,15 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 
 function ActivityDemoCore() {
   const [tripService] = useState(() => {
-    debugLogger.log('🏗️ [ActivityDemo] Creating TripService instance...');
-    const service = new TripService();
-    debugLogger.log('✅ [ActivityDemo] TripService instance created');
-    return service;
+    console.log('🏗️ [ActivityDemo] Creating TripService instance...');
+    try {
+      const service = new TripService();
+      console.log('✅ [ActivityDemo] TripService instance created successfully');
+      return service;
+    } catch (error) {
+      console.error('💀 [ActivityDemo] TripService constructor FAILED:', error);
+      throw error;
+    }
   });
   const [state, setState] = useState<ActivityState>({
     isTracking: false,
@@ -88,17 +93,18 @@ function ActivityDemoCore() {
   };
 
   useEffect(() => {
-    debugLogger.log('🚀 [ActivityDemo] === USEEFFECT STARTING ===');
+    console.log('🚀 [ActivityDemo] === USEEFFECT STARTING ===');
+    addDebugInfo('🚀 useEffect starting - checking TripService');
     
     // Defensive check
     if (!tripService) {
       console.error('💥 [ActivityDemo] TripService not initialized!');
-      addDebugInfo('ERROR: TripService not initialized');
-      debugLogger.log('💀 [ActivityDemo] TripService not initialized');
+      addDebugInfo('💀 ERROR: TripService not initialized');
       return;
     }
     
-    debugLogger.log('✅ [ActivityDemo] TripService exists, setting up debug listener...');
+    console.log('✅ [ActivityDemo] TripService exists, setting up debug listener...');
+    addDebugInfo('✅ TripService exists - setting up debugger');
     
     // Subscribe to debug logger to capture all service logs
     const handleDebugLog = (message: string) => {
@@ -108,11 +114,17 @@ function ActivityDemoCore() {
       }));
     };
     
-    debugLogger.addListener(handleDebugLog);
-    debugLogger.log('🔗 [ActivityDemo] Debug listener added');
+    try {
+      debugLogger.addListener(handleDebugLog);
+      console.log('🔗 [ActivityDemo] Debug listener added successfully');
+      addDebugInfo('🔗 Debug listener connected');
+    } catch (error) {
+      console.error('💥 [ActivityDemo] Failed to add debug listener:', error);
+      addDebugInfo('💥 Debug listener FAILED: ' + error.message);
+    }
     
-    addDebugInfo('useEffect running, starting initialization');
-    debugLogger.log('📞 [ActivityDemo] About to call initializeTracking...');
+    addDebugInfo('📞 About to call initializeTracking...');
+    console.log('📞 [ActivityDemo] About to call initializeTracking...');
     initializeTracking();
     
     // Set up periodic permission retry if denied
@@ -137,19 +149,26 @@ function ActivityDemoCore() {
   }, [state.permissionStatus]);
 
   const initializeTracking = async () => {
-    console.log('🚀 [ActivityDemo] Starting initialization...');
-    addDebugInfo('Starting initialization');
+    console.log('🚀 [ActivityDemo] === INITIALIZE TRACKING CALLED ===');
+    addDebugInfo('🚀 INITIALIZE TRACKING CALLED');
     
     try {
+      console.log('📱 [ActivityDemo] Setting permission status to checking...');
       setState(prev => ({ ...prev, permissionStatus: 'checking', error: null }));
-      addDebugInfo('Set status to checking');
+      addDebugInfo('📱 Set status to checking');
       
-      console.log('📱 [ActivityDemo] Set status to checking, calling tripService.initialize()...');
-      addDebugInfo('Calling tripService.initialize()');
+      console.log('📞 [ActivityDemo] About to call tripService.initialize()...');
+      addDebugInfo('📞 Calling tripService.initialize()');
+      
+      if (!tripService) {
+        console.error('💀 [ActivityDemo] TripService is null in initializeTracking!');
+        addDebugInfo('💀 TripService is null!');
+        return;
+      }
       
       const success = await tripService.initialize();
-      console.log('📋 [ActivityDemo] TripService initialize result:', success);
-      addDebugInfo(`TripService result: ${success}`);
+      console.log('📋 [ActivityDemo] TripService initialize returned:', success);
+      addDebugInfo(`📋 TripService result: ${success}`);
       
       if (success) {
         console.log('✅ [ActivityDemo] Success! Setting up tracking...');
