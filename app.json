@@ -16,7 +16,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.aqueduct.fahrbuch"
+      "bundleIdentifier": "com.aqueducttrain.fahrbuch",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,14 +29,14 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.aqueduct.fahrbuch"
+      "package": "com.aqueducttrain.fahrbuch"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "fahrbuch-mvp"
+        "projectId": "26d68730-99c4-4dbc-bb18-6b7034723874"
       }
     }
   }

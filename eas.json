@@ -1,34 +1,18 @@
 {
   "cli": {
-    "version": ">= 13.2.3"
+    "version": ">= 18.0.6",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "resourceClass": "m-medium"
-      },
-      "android": {
-        "resourceClass": "large"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "ios": {
-        "resourceClass": "m-medium"
-      },
-      "android": {
-        "resourceClass": "large"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "ios": {
-        "resourceClass": "m-medium"
-      },
-      "android": {
-        "resourceClass": "large"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
