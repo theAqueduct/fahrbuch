@@ -1,11 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import SimpleLocationDemo from './src/screens/SimpleLocationDemo';
+import MileageTracker from './src/screens/MileageTracker';
 
 export default function App() {
   return (
     <SafeAreaView style={styles.container}>
-      <SimpleLocationDemo />
+      <MileageTracker />
       <StatusBar style="auto" />
     </SafeAreaView>
   );
