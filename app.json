@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fahrbuch",
+    "name": "Fahrbuch",
     "slug": "fahrbuch",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,8 +11,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aqueduct.fahrbuch"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +25,16 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.aqueduct.fahrbuch"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fahrbuch-mvp"
+      }
     }
   }
 }
