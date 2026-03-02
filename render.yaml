@@ -2,7 +2,7 @@ services:
   - type: web
     name: fahrbuch-web
     env: static
-    buildCommand: npm ci && npx expo export --platform web
+    buildCommand: npm ci && npm run build:web
     staticPublishPath: ./dist
     routes:
       - type: rewrite
