@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "fahrbuch",
-    "slug": "fahrbuch",
+    "name": "fahrbuch-stable",
+    "slug": "fahrbuch-stable",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,11 +12,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.aqueducttrain.fahrbuch",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -24,24 +20,10 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.aqueducttrain.fahrbuch"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "5e92f328-300c-414e-a5cb-e4fde83662f4"
-      }
-    },
-    "owner": "aqueducttrain",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/5e92f328-300c-414e-a5cb-e4fde83662f4"
     }
   }
 }
