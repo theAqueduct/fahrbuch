@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: fahrbuch-web
+    env: static
+    buildCommand: npm ci && npm run build:web
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_ENV
+        value: production

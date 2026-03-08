@@ -119,8 +119,9 @@ function ActivityDemoCore() {
       console.log('🔗 [ActivityDemo] Debug listener added successfully');
       addDebugInfo('🔗 Debug listener connected');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('💥 [ActivityDemo] Failed to add debug listener:', error);
-      addDebugInfo('💥 Debug listener FAILED: ' + error.message);
+      addDebugInfo('💥 Debug listener FAILED: ' + errorMessage);
     }
     
     addDebugInfo('📞 About to call initializeTracking...');

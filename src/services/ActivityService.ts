@@ -91,7 +91,8 @@ export class ActivityService {
       return false;
       
     } catch (error) {
-      debugLogger.log(`💥 [ActivityService] Error requesting ${type} permission: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      debugLogger.log(`💥 [ActivityService] Error requesting ${type} permission: ${errorMessage}`);
       debugLogger.log(`💥 [ActivityService] Permission API failed for ${type} - this suggests a code issue`);
       return false;
     }
@@ -152,11 +153,12 @@ export class ActivityService {
       
     } catch (error) {
       debugLogger.log(`💀 [ActivityService] === CRITICAL ERROR OCCURRED ===`);
-      debugLogger.log(`💀 [ActivityService] Error message: ${error?.message || 'No message'}`);
-      debugLogger.log(`💀 [ActivityService] Error name: ${error?.name || 'No name'}`);
-      debugLogger.log(`💀 [ActivityService] Error toString: ${error?.toString() || 'Cannot convert to string'}`);
-      if (error?.stack) {
-        debugLogger.log(`💀 [ActivityService] Stack (first 300 chars): ${error.stack.substring(0, 300)}...`);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      debugLogger.log(`💀 [ActivityService] Error message: ${errorObj.message || 'No message'}`);
+      debugLogger.log(`💀 [ActivityService] Error name: ${errorObj.name || 'No name'}`);
+      debugLogger.log(`💀 [ActivityService] Error toString: ${errorObj.toString() || 'Cannot convert to string'}`);
+      if (errorObj.stack) {
+        debugLogger.log(`💀 [ActivityService] Stack (first 300 chars): ${errorObj.stack.substring(0, 300)}...`);
       }
       debugLogger.log(`💀 [ActivityService] === RETURNING FALSE DUE TO ERROR ===`);
       return false;

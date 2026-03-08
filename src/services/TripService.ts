@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { ActivityService, debugLogger } from './ActivityService';
+import { DatabaseService } from './DatabaseService';
 import { 
   Trip, 
   TripStatus, 
@@ -13,6 +14,7 @@ import {
 
 export class TripService {
   private activityService: ActivityService;
+  private databaseService: DatabaseService;
   private currentTrip: Trip | null = null;
   private isTracking = false;
   private tripCallbacks: ((trip: Trip) => void)[] = [];
@@ -21,6 +23,10 @@ export class TripService {
   private vehicleActivityCount = 0;
   private stationaryCount = 0;
   private lastSignificantLocation: LocationType | null = null;
+  
+  // GPS breadcrumb tracking
+  private gpsTrackingInterval: NodeJS.Timeout | null = null;
+  private readonly GPS_TRACKING_INTERVAL = 15000; // 15 seconds
 
   constructor() {
     console.log('🏗️ [TripService] === CONSTRUCTOR STARTING ===');
@@ -28,6 +34,10 @@ export class TripService {
       console.log('🔧 [TripService] Creating ActivityService...');
       this.activityService = new ActivityService();
       console.log('✅ [TripService] ActivityService created successfully');
+      
+      console.log('🗄️ [TripService] Creating DatabaseService...');
+      this.databaseService = new DatabaseService();
+      console.log('✅ [TripService] DatabaseService created successfully');
       
       console.log('🔔 [TripService] Setting up notifications...');
       this.setupNotifications();
@@ -48,6 +58,14 @@ export class TripService {
     console.log('🚀 [TripService] === INITIALIZE CALLED ===');
     
     try {
+      console.log('🗄️ [TripService] Initializing database...');
+      const dbSuccess = await this.databaseService.initialize();
+      if (!dbSuccess) {
+        console.error('💀 [TripService] Database initialization failed');
+        return false;
+      }
+      console.log('✅ [TripService] Database initialized successfully');
+      
       console.log('📢 [TripService] Requesting notification permissions...');
       await this.requestNotificationPermissionsAggressively();
       console.log('✅ [TripService] Notification permissions completed');
@@ -95,11 +113,13 @@ export class TripService {
       debugLogger.log(`⚠️ [TripService] Notification permission denied: ${result.status}`);
       
     } catch (error) {
-      debugLogger.log(`💥 [TripService] Failed to request notification permissions: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      debugLogger.log(`💥 [TripService] Failed to request notification permissions: ${errorMessage}`);
     }
   }
 
   stop(): void {
+    this.stopGpsTracking();
     this.activityService.stopMonitoring();
     this.isTracking = false;
     if (this.currentTrip && this.currentTrip.status === TripStatus.ACTIVE) {
@@ -204,7 +224,13 @@ export class TripService {
     };
 
     this.currentTrip = trip;
-    console.log('Trip started:', trip.id);
+    console.log('🚗 Trip started:', trip.id);
+
+    // Start GPS breadcrumb collection
+    this.startGpsTracking();
+
+    // Send trip start notification
+    await this.sendTripStartNotification(trip);
 
     // Notify subscribers
     this.tripCallbacks.forEach(callback => callback(trip));
@@ -212,6 +238,9 @@ export class TripService {
 
   private async endCurrentTrip(): Promise<void> {
     if (!this.currentTrip || this.currentTrip.status !== TripStatus.ACTIVE) return;
+
+    // Stop GPS tracking first
+    this.stopGpsTracking();
 
     const currentLocation = await this.getCurrentLocation();
     if (!currentLocation) return;
@@ -242,10 +271,13 @@ export class TripService {
     // Add end location to route
     this.currentTrip.route.push(currentLocation);
 
+    // Save final GPS point
+    await this.saveGpsPoint(currentLocation);
+
     // Reverse geocode addresses
     await this.addAddressesToTrip(this.currentTrip);
 
-    console.log('Trip ended:', this.currentTrip.id, `${(distance / 1000).toFixed(1)} km`);
+    console.log('📍 Trip ended:', this.currentTrip.id, `${(distance / 1000).toFixed(1)} km`);
 
     // Send notification for tagging
     await this.sendTripEndNotification(this.currentTrip);
@@ -282,6 +314,7 @@ export class TripService {
         timestamp: location.timestamp,
         accuracy: location.coords.accuracy || undefined,
         speed: location.coords.speed || undefined,
+        heading: location.coords.heading || undefined,
       };
     } catch (error) {
       console.error('Failed to get current location:', error);
@@ -339,6 +372,56 @@ export class TripService {
     return parts.join(', ') || 'Unknown Location';
   }
 
+  private startGpsTracking(): void {
+    if (this.gpsTrackingInterval) {
+      clearInterval(this.gpsTrackingInterval);
+    }
+
+    console.log(`📍 Starting GPS breadcrumb tracking every ${this.GPS_TRACKING_INTERVAL/1000}s`);
+    
+    this.gpsTrackingInterval = setInterval(async () => {
+      if (this.currentTrip && this.currentTrip.status === TripStatus.ACTIVE) {
+        const location = await this.getCurrentLocation();
+        if (location) {
+          await this.saveGpsPoint(location);
+        }
+      }
+    }, this.GPS_TRACKING_INTERVAL);
+  }
+
+  private stopGpsTracking(): void {
+    if (this.gpsTrackingInterval) {
+      clearInterval(this.gpsTrackingInterval);
+      this.gpsTrackingInterval = null;
+      console.log('📍 GPS breadcrumb tracking stopped');
+    }
+  }
+
+  private async saveGpsPoint(location: LocationType): Promise<void> {
+    if (!this.currentTrip) return;
+    
+    try {
+      const success = await this.databaseService.saveGpsPoint(this.currentTrip.id, location);
+      if (success) {
+        console.log(`📍 GPS point saved for trip ${this.currentTrip.id}`);
+      }
+    } catch (error) {
+      console.error(`Failed to save GPS point for trip ${this.currentTrip.id}:`, error);
+    }
+  }
+
+  private async sendTripStartNotification(trip: Trip): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🚗 Trip started',
+        body: 'Automatically tracking your journey',
+        data: { tripId: trip.id },
+        categoryIdentifier: 'tripTracking',
+      },
+      trigger: null, // Send immediately
+    });
+  }
+
   private async sendTripEndNotification(trip: Trip): Promise<void> {
     const startAddr = trip.startAddress?.formatted || 'Unknown';
     const endAddr = trip.endAddress?.formatted || 'Unknown';
@@ -375,15 +458,34 @@ export class TripService {
   }
 
   private async saveTrip(trip: Trip): Promise<void> {
-    // In a real app, this would save to SQLite
-    console.log('Saving trip to local storage:', trip.id);
-    // TODO: Implement SQLite storage
+    try {
+      console.log(`💾 [TripService] Saving trip to database: ${trip.id}`);
+      const success = await this.databaseService.saveTrip(trip);
+      if (success) {
+        console.log(`✅ [TripService] Trip saved successfully: ${trip.id}`);
+      } else {
+        console.error(`❌ [TripService] Failed to save trip: ${trip.id}`);
+      }
+    } catch (error) {
+      console.error(`💥 [TripService] Error saving trip ${trip.id}:`, error);
+    }
   }
 
   // Public methods for trip management
-  async tagTrip(tripId: string, purpose: TripPurpose, note?: string): Promise<void> {
-    // In a real app, would update in database
-    console.log(`Tagged trip ${tripId} as ${purpose}`, note ? `with note: ${note}` : '');
+  async tagTrip(tripId: string, purpose: TripPurpose, note?: string): Promise<boolean> {
+    try {
+      console.log(`🏷️ [TripService] Tagging trip ${tripId} as ${purpose}`, note ? `with note: ${note}` : '');
+      const success = await this.databaseService.updateTripPurpose(tripId, purpose, note);
+      if (success) {
+        console.log(`✅ [TripService] Trip tagged successfully: ${tripId}`);
+      } else {
+        console.error(`❌ [TripService] Failed to tag trip: ${tripId}`);
+      }
+      return success;
+    } catch (error) {
+      console.error(`💥 [TripService] Error tagging trip ${tripId}:`, error);
+      return false;
+    }
   }
 
   getCurrentTrip(): Trip | null {
@@ -392,5 +494,49 @@ export class TripService {
 
   isCurrentlyTracking(): boolean {
     return this.isTracking;
+  }
+
+  // Database retrieval methods
+  async getTrips(limit: number = 50, offset: number = 0): Promise<Trip[]> {
+    try {
+      return await this.databaseService.getTrips(limit, offset);
+    } catch (error) {
+      console.error(`💥 [TripService] Error retrieving trips:`, error);
+      return [];
+    }
+  }
+
+  async getTripById(tripId: string): Promise<Trip | null> {
+    try {
+      return await this.databaseService.getTripById(tripId);
+    } catch (error) {
+      console.error(`💥 [TripService] Error retrieving trip ${tripId}:`, error);
+      return null;
+    }
+  }
+
+  async deleteTrip(tripId: string): Promise<boolean> {
+    try {
+      return await this.databaseService.deleteTrip(tripId);
+    } catch (error) {
+      console.error(`💥 [TripService] Error deleting trip ${tripId}:`, error);
+      return false;
+    }
+  }
+
+  async getTripGpsPoints(tripId: string): Promise<LocationType[]> {
+    try {
+      return await this.databaseService.getTripGpsPoints(tripId);
+    } catch (error) {
+      console.error(`💥 [TripService] Error retrieving GPS points for trip ${tripId}:`, error);
+      return [];
+    }
+  }
+
+  // Clean up resources
+  async close(): Promise<void> {
+    this.stop();
+    await this.databaseService.close();
+    console.log('🛑 [TripService] Service closed');
   }
 }

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fahrbuch",
+    "name": "Fahrbuch",
     "slug": "fahrbuch",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,6 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aqueducttrain.fahrbuch",

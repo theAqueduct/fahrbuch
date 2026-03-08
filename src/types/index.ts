@@ -5,6 +5,7 @@ export interface Location {
   timestamp: number;
   accuracy?: number;
   speed?: number;
+  heading?: number;
 }
 
 export interface Address {
